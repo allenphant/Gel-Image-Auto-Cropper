@@ -32,10 +32,10 @@
 ## 實際演示 (Demo)
 
 ### 原始膠片 (Raw Data)
-`![Raw Gel](data/demo/before.png)`
+![Raw Gel](data/demo/before.png)
 
 ### 處理後成果 (Processed Output)
-`![Processed Gel](data/demo/after.png)`
+![Processed Gel](data/demo/after.png)
 
 ## 使用技術 (Tech Stack)
 * **Language:** Python
@@ -53,5 +53,6 @@ pip install -r requirements.txt
 # Run the application
 
 python src/main.py
+
 
 
