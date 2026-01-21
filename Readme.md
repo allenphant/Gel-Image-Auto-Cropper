@@ -33,12 +33,10 @@
 ## 實際演示 (Demo)
 
 ### 原始膠片 (Raw Data)
-*(請將 raw 資料夾中的一張圖片連結貼在這裡，例如：)*
-`![Raw Gel](data\20221103_raw\A4.tiff)`
+`![Raw Gel](data/demo/before.png)`
 
 ### 處理後成果 (Processed Output)
-*(請將 processed 資料夾中的一張圖片連結貼在這裡)*
-`![Processed Gel](data\20221103_cropped\A4.tiff)`
+`![Processed Gel](data/demo/after.png)`
 
 ## 使用技術 (Tech Stack)
 * **Language:** Python
@@ -54,4 +52,5 @@ git clone [https://github.com/](https://github.com/)[YourUsername]/Gel-Image-Aut
 pip install -r requirements.txt
 
 # Run the application
+
 python src/main.py
