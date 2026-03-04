@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微生物膠片裁切工具 (Gel Electrophoresis Cropper) v4</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- UTIF.js for TIFF support -->
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+    <!-- JSZip for batch download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FileSaver for saving files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+        }
+
+        .loading-overlay {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #10B981;
+        }
+
+        .toggle-checkbox:checked+.toggle-label {
+            background-color: #10B981;
+        }
+
+        .adjust-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #374151;
+            color: #9CA3AF;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            user-select: none;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .adjust-btn:hover {
+            background-color: #4B5563;
+            color: white;
+        }
+
+        .adjust-btn:active {
+            background-color: #6B7280;
+            transform: scale(0.95);
+        }
+
+        .mode-btn {
+            background: #374151;
+            color: #9ca3af;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+        .mode-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- Header -->
+    <header
+        class="bg-gray-800 border-b border-gray-700 h-16 flex items-center justify-between px-4 shrink-0 z-10 shadow-md">
+        <div class="flex items-center gap-2">
+            <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                </path>
+            </svg>
+            <h1 class="font-bold text-lg tracking-wide flex items-baseline gap-2">
+                GelCrop
+                <span class="text-xs text-blue-300 font-normal">v4.0 Multi-Mode</span>
+            </h1>
+        </div>
+        <div class="flex gap-3">
+            <label
+                class="cursor-pointer bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm flex items-center gap-2 transition">
+                <input type="file" id="fileInput" class="hidden" multiple
+                    accept="image/png, image/jpeg, image/tiff, image/bmp, .tif, .tiff, .bmp">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                選擇檔案
+            </label>
+            <label
+                class="cursor-pointer bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm flex items-center gap-2 transition">
+                <input type="file" id="folderInput" class="hidden" webkitdirectory directory multiple>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                </svg>
+                資料夾上傳
+            </label>
+            <button id="downloadAllBtn"
+                class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-sm font-medium shadow flex items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                全部下載 (.zip)
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0">
+            <div class="p-3 border-b border-gray-700 bg-gray-800 sticky top-0 z-10 flex justify-between items-center">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">待處理清單 (<span
+                        id="fileCount">0</span>)</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-gray-500">↑↓ 鍵切換</span>
+                    <label id="addMoreBtn"
+                        class="cursor-pointer bg-gray-700 hover:bg-green-700 hover:text-white px-2 py-0.5 rounded text-[11px] text-gray-300 flex items-center gap-1 transition"
+                        title="繼續新增圖片">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
+                        新增圖片
+                        <input type="file" class="hidden" id="addMoreInput" multiple
+                            accept="image/png, image/jpeg, image/tiff, image/bmp, .tif, .tiff, .bmp">
+                    </label>
+                </div>
+            </div>
+            <div id="fileList" class="flex-1 overflow-y-auto p-2 space-y-2 relative outline-none" tabindex="-1">
+                <div id="sidebarEmptyState"
+                    class="text-center text-gray-500 text-sm mt-4 p-6 border-2 border-dashed border-gray-600 rounded-lg mx-2 cursor-pointer hover:bg-gray-700 hover:border-gray-500 transition"
+                    onclick="document.getElementById('fileInput').click()">
+                    <svg class="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <p>尚無檔案</p>
+                    <p class="text-xs mt-1">點擊或拖曳上傳</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center -->
+        <main class="flex-1 flex flex-col min-w-0 bg-gray-900 relative">
+
+            <!-- Dynamic Toolbar based on active file mode -->
+            <div class="h-24 bg-gray-800 border-b border-gray-700 flex flex-col px-4 pt-2 shrink-0 z-10">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="text-xs text-gray-400 font-bold uppercase tracking-wider">偵測模式:</span>
+                    <button class="mode-btn mode-sel active" data-mode="standard">A. 標準膠片 (SV波谷)</button>
+                    <button class="mode-btn mode-sel" data-mode="moire">B. 抗摩爾紋 (局部自適應)</button>
+                    <button class="mode-btn mode-sel" data-mode="tlc">C. TLC紙片 (背景濾除)</button>
+                    <div class="flex-1"></div>
+                    <div class="text-[10px] text-yellow-500 bg-yellow-900/30 px-2 py-1 rounded">※ 綠框四角縮放時，對角將固定不動</div>
+                    <button id="resetBtn"
+                        class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition"
+                        title="重新計算 (Reset)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Parameters row -->
+                <div class="flex items-center gap-6 overflow-x-auto pb-2">
+                    <div class="flex items-center gap-2 mr-2 border-r border-gray-600 pr-4 shrink-0">
+                        <div
+                            class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="debugToggle"
+                                class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 left-0 transition-all duration-300" />
+                            <label for="debugToggle"
+                                class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer transition-colors duration-300"></label>
+                        </div>
+                        <label for="debugToggle" class="text-xs text-gray-300 font-bold cursor-pointer">Debug
+                            模式<br><span class="text-[10px] font-normal text-gray-400">顯示二值化 Mask</span></label>
+                    </div>
+
+                    <!-- Common Params -->
+                    <div class="flex flex-col w-32 shrink-0">
+                        <div class="flex justify-between text-xs text-gray-400 mb-1"><span>邊緣留白</span><span
+                                id="val-pad">25px</span></div>
+                        <div class="flex items-center gap-1">
+                            <div class="adjust-btn" data-target="slide-pad" data-action="dec">-</div>
+                            <input type="range" id="slide-pad" min="0" max="100" value="25"
+                                class="h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-500 w-full">
+                            <div class="adjust-btn" data-target="slide-pad" data-action="inc">+</div>
+                        </div>
+                    </div>
+
+                    <!-- Mode specific params container -->
+                    <div id="param-container" class="flex gap-6"></div>
+                </div>
+            </div>
+
+            <!-- Workspace -->
+            <div id="workspace" class="flex-1 flex overflow-hidden relative">
+                <div class="flex-1 bg-black relative flex items-center justify-center border-r border-gray-700 select-none overflow-hidden"
+                    id="editorWrap">
+                    <div class="absolute top-2 left-2 pointer-events-none z-10 flex flex-col gap-1 items-start">
+                        <div id="editorLabel" class="bg-black/50 px-2 py-1 rounded text-xs text-gray-300 shadow">原始影像
+                            (編輯區)</div>
+                    </div>
+                    <canvas id="editorCanvas" class="max-w-full max-h-full cursor-crosshair"></canvas>
+                </div>
+                <div
+                    class="flex-1 bg-gray-900 relative flex items-center justify-center select-none overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTAgMGgyMHYyMEgwVjB6bTEwIDEwaDEwdjEwSDEwVjEwek0wIDEwaDEwdjEwSDBWMTB6IiBmaWxsPSIjMTExODI3IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48L3N2Zz4=')]">
+                    <div
+                        class="absolute top-2 left-2 bg-black/50 px-2 py-1 rounded text-xs text-gray-300 pointer-events-none z-10 shadow">
+                        預覽結果</div>
+                    <canvas id="previewCanvas"
+                        class="shadow-2xl border border-gray-700 max-w-[90%] max-h-[90%]"></canvas>
+                </div>
+            </div>
+
+            <div id="emptyState"
+                class="absolute inset-0 bg-gray-900 z-20 flex flex-col items-center justify-center text-gray-500 font-sans">
+                <svg class="w-20 h-20 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                    </path>
+                </svg>
+                <p class="text-xl font-light">請先上傳影像</p>
+                <p class="text-sm mt-2">支援 .jpg, .png, .bmp, .tif (TIFF)</p>
+            </div>
+
+            <div id="loadingOverlay"
+                class="loading-overlay absolute inset-0 z-50 hidden flex flex-col items-center justify-center text-white font-sans">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mb-4"></div>
+                <p id="loadingText" class="text-lg font-light tracking-wide">處理中...</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Configuration for Mode Specs ---
+        const modeSpecs = {
+            standard: [
+                { id: 'std_thr', label: '閾值偏移', min: -50, max: 50, step: 1, def: 0, color: 'blue' },
+                { id: 'std_ker', label: '去噪強度', min: 1, max: 15, step: 1, def: 3, color: 'orange' }
+            ],
+            moire: [
+                { id: 'moi_win', label: '局部窗口', min: 5, max: 51, step: 2, def: 21, color: 'purple' },
+                { id: 'moi_sen', label: '偵測閾值 (負=抓更亮目標)', min: -40, max: 10, step: 1, def: -25, color: 'blue', tooltip: '數值越小 → 只抓比周圍更亮的區塊；適合白色高光發光帶。數值越大 → 抓更多偏暗的區域，但雜訊也會增多。' }
+            ],
+            tlc: [
+                { id: 'tlc_hue', label: '背景色相 (藍紫)', min: 180, max: 300, step: 1, def: 240, color: 'purple' },
+                { id: 'tlc_tol', label: '色相寬容度', min: 0, max: 50, step: 1, def: 10, color: 'orange' },
+                { id: 'tlc_ker', label: '去塵強度', min: 1, max: 15, step: 1, def: 5, color: 'red' }
+            ]
+        };
+
+        // --- State ---
+        const state = {
+            files: [],
+            currentId: null,
+            isDragging: false, dragMode: null,
+            dragStart: { x: 0, y: 0 }, dragStartParams: null,
+            canvasScale: 1, debugMode: false
+        };
+
+        const els = {
+            fileList: document.getElementById('fileList'),
+            fileCount: document.getElementById('fileCount'),
+            editorCanvas: document.getElementById('editorCanvas'),
+            previewCanvas: document.getElementById('previewCanvas'),
+            ctxEditor: document.getElementById('editorCanvas').getContext('2d'),
+            ctxPreview: document.getElementById('previewCanvas').getContext('2d'),
+            paramContainer: document.getElementById('param-container'),
+            padSlider: document.getElementById('slide-pad'),
+            padVal: document.getElementById('val-pad')
+        };
+
+        // --- Image processing primitives ---
+        function downsample(img, maxW) {
+            if (img.width <= maxW) {
+                const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+                c.getContext('2d').drawImage(img, 0, 0);
+                return { data: c.getContext('2d').getImageData(0, 0, img.width, img.height), w: img.width, h: img.height, scale: 1 };
+            }
+            const scale = maxW / img.width;
+            const dw = Math.round(img.width * scale), dh = Math.round(img.height * scale);
+            const d = document.createElement('canvas'); d.width = dw; d.height = dh;
+            d.getContext('2d').drawImage(img, 0, 0, dw, dh);
+            return { data: d.getContext('2d').getImageData(0, 0, dw, dh), w: dw, h: dh, scale };
+        }
+
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+            if (d > 0) { if (mx === r) h = (g - b) / d + 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h = (h % 6) * 60; }
+            return [Math.round(h), mx > 0 ? d / mx : 0, mx];
+        }
+
+        function morphOp(mask, w, h, krx, kry, dilate) {
+            const out = new Uint8Array(w * h);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let found = !dilate;
+                    outer: for (let ky = -kry; ky <= kry; ky++) {
+                        for (let kx = -krx; kx <= krx; kx++) {
+                            const nx = x + kx, ny = y + ky;
+                            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                                if (dilate && mask[ny * w + nx]) { found = true; break outer; }
+                                if (!dilate && !mask[ny * w + nx]) { found = false; break outer; }
+                            }
+                        }
+                    }
+                    out[y * w + x] = found ? 1 : 0;
+                }
+            }
+            return out;
+        }
+
+        function getLargestBlobRect(mask, w, h) {
+            const vis = new Uint8Array(w * h);
+            let maxBlob = null, maxLen = 0;
+            for (let i = 0; i < w * h; i++) {
+                if (!mask[i] || vis[i]) continue;
+                const blob = []; const q = [i]; vis[i] = 1; let head = 0;
+                while (head < q.length) {
+                    const curr = q[head++]; blob.push(curr);
+                    const cx = curr % w, cy = Math.floor(curr / w);
+                    if (cx > 0) { const n = curr - 1; if (mask[n] && !vis[n]) { vis[n] = 1; q.push(n); } }
+                    if (cx < w - 1) { const n = curr + 1; if (mask[n] && !vis[n]) { vis[n] = 1; q.push(n); } }
+                    if (cy > 0) { const n = curr - w; if (mask[n] && !vis[n]) { vis[n] = 1; q.push(n); } }
+                    if (cy < h - 1) { const n = curr + w; if (mask[n] && !vis[n]) { vis[n] = 1; q.push(n); } }
+                }
+                if (blob.length > maxLen) { maxLen = blob.length; maxBlob = blob; }
+            }
+            if (!maxBlob) return null;
+
+            let m00 = 0, m10 = 0, m01 = 0, m11 = 0, m20 = 0, m02 = 0;
+            for (const i of maxBlob) {
+                const x = i % w, y = Math.floor(i / w);
+                m00++; m10 += x; m01 += y;
+            }
+            const cx = m10 / m00, cy = m01 / m00;
+            for (const i of maxBlob) {
+                const x = (i % w) - cx, y = Math.floor(i / w) - cy;
+                m11 += x * y; m20 += x * x; m02 += y * y;
+            }
+            let angle = 0.5 * Math.atan2(2 * m11, m20 - m02 || 0.0001);
+            const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const i of maxBlob) {
+                const x = (i % w) - cx, y = Math.floor(i / w) - cy;
+                const rx = x * cosA - y * sinA, ry = x * sinA + y * cosA;
+                if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
+                if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
+            }
+            return { cx, cy, w: maxX - minX, h: maxY - minY, angle, valid: true };
+        }
+
+        // --- Specific Pipelines ---
+        function pipeStandard(f) {
+            const { data, w, h, scale } = downsample(f.imgElement, 640);
+            const feat = new Float32Array(w * h);
+            const hist = new Int32Array(256);
+            for (let i = 0; i < w * h; i++) {
+                const [, s, v] = rgbToHsv(data.data[i * 4], data.data[i * 4 + 1], data.data[i * 4 + 2]);
+                feat[i] = s * 0.8 + v * 0.2;
+                hist[Math.min(255, Math.floor(feat[i] * 256))]++;
+            }
+            let sum = 0, sumB = 0, wB = 0, wF = 0, maxVar = 0, thresh = 0;
+            for (let i = 0; i < 256; i++) sum += i * hist[i];
+            for (let i = 0; i < 256; i++) {
+                wB += hist[i]; if (wB === 0) continue; wF = w * h - wB; if (wF === 0) break;
+                sumB += i * hist[i]; const mB = sumB / wB, mF = (sum - sumB) / wF;
+                const vr = wB * wF * (mB - mF) * (mB - mF);
+                if (vr > maxVar) { maxVar = vr; thresh = i; }
+            }
+            const off = f.params.std_thr / 256;
+            const t = Math.max(0, Math.min(1, thresh / 255 + off));
+            let mask = new Uint8Array(w * h);
+            for (let i = 0; i < w * h; i++) mask[i] = feat[i] > t ? 1 : 0;
+            const kr = f.params.std_ker;
+            mask = morphOp(mask, w, h, kr, kr, false);
+            mask = morphOp(mask, w, h, kr, kr, true);
+            mask = morphOp(mask, w, h, kr, kr, true);
+            mask = morphOp(mask, w, h, kr, kr, false);
+            return { mask, w, h, scale, rect: getLargestBlobRect(mask, w, h) };
+        }
+
+        function pipeMoire(f) {
+            const { data, w, h, scale } = downsample(f.imgElement, 150); // Heavy downscale
+            const feat = new Float32Array(w * h);
+            for (let i = 0; i < w * h; i++) feat[i] = data.data[i * 4] * 0.3 + data.data[i * 4 + 1] * 0.6 + data.data[i * 4 + 2] * 0.1;
+
+            const intg = new Float32Array(w * h);
+            for (let y = 0; y < h; y++) {
+                let sum = 0;
+                for (let x = 0; x < w; x++) {
+                    sum += feat[y * w + x];
+                    intg[y * w + x] = sum + (y > 0 ? intg[(y - 1) * w + x] : 0);
+                }
+            }
+            const win = f.params.moi_win, r = Math.floor(win / 2), sen = f.params.moi_sen;
+            let mask = new Uint8Array(w * h);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const x0 = Math.max(0, x - r), y0 = Math.max(0, y - r), x1 = Math.min(w - 1, x + r), y1 = Math.min(h - 1, y + r);
+                    let sum = intg[y1 * w + x1];
+                    if (x0 > 0 && y0 > 0) sum += intg[(y0 - 1) * w + (x0 - 1)];
+                    if (x0 > 0) sum -= intg[y1 * w + (x0 - 1)];
+                    if (y0 > 0) sum -= intg[(y0 - 1) * w + x1];
+                    const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+                    mask[y * w + x] = feat[y * w + x] > (sum / area) - sen ? 1 : 0;
+                }
+            }
+            mask = morphOp(mask, w, h, 6, 1, true); // Horizontal heavy
+            mask = morphOp(mask, w, h, 2, 2, false);
+            return { mask, w, h, scale, rect: getLargestBlobRect(mask, w, h) };
+        }
+
+        function pipeTlc(f) {
+            const { data, w, h, scale } = downsample(f.imgElement, 400);
+            const tHue = f.params.tlc_hue, tTol = f.params.tlc_tol, ker = f.params.tlc_ker;
+            let mask = new Uint8Array(w * h);
+            for (let i = 0; i < w * h; i++) {
+                const [hVal, sVal, vVal] = rgbToHsv(data.data[i * 4], data.data[i * 4 + 1], data.data[i * 4 + 2]);
+                let diff = Math.abs(hVal - tHue); if (diff > 180) diff = 360 - diff;
+                const isBg = diff <= tTol && sVal > 0.2 && vVal > 0.1;
+                mask[i] = isBg ? 0 : 1; // Invert background
+            }
+            mask = morphOp(mask, w, h, ker, ker, false);
+            mask = morphOp(mask, w, h, ker + 2, ker + 2, true);
+            return { mask, w, h, scale, rect: getLargestBlobRect(mask, w, h) };
+        }
+
+        // --- File Handling & Lifecycle ---
+        function showLoading(show, t) { document.getElementById('loadingOverlay').classList.toggle('hidden', !show); if (t) document.getElementById('loadingText').textContent = t; }
+
+        document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+        document.getElementById('folderInput').addEventListener('change', e => handleFiles(e.target.files));
+        document.getElementById('addMoreInput').addEventListener('change', e => handleFiles(e.target.files));
+
+        // Keyboard arrow key navigation
+        window.addEventListener('keydown', e => {
+            if (!state.files.length) return;
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) && document.activeElement.type !== 'range') return;
+            const idx = state.files.findIndex(f => f.id === state.currentId);
+            if (e.key === 'ArrowDown' && idx < state.files.length - 1) {
+                e.preventDefault();
+                selectFile(state.files[idx + 1].id);
+                const el = document.querySelector(`[data-id="${state.files[idx + 1].id}"]`);
+                if (el) el.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp' && idx > 0) {
+                e.preventDefault();
+                selectFile(state.files[idx - 1].id);
+                const el = document.querySelector(`[data-id="${state.files[idx - 1].id}"]`);
+                if (el) el.scrollIntoView({ block: 'nearest' });
+            }
+        });
+
+        async function handleFiles(fileList) {
+            showLoading(true, '讀取檔案中...');
+            const newFiles = Array.from(fileList).filter(f => f.type.startsWith('image/') || f.name.toLowerCase().match(/\.(tif|tiff|bmp)$/));
+            if (!newFiles.length) { showLoading(false); return; }
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('sidebarEmptyState').style.display = 'none';
+
+            for (const file of newFiles) {
+                const id = Date.now() + Math.random().toString(36).substr(2, 9);
+                const imgElement = await loadImage(file);
+                let origType = file.type || 'unknown'; if (file.name.match(/\.(jpg|jpeg)$/i)) origType = 'image/jpeg';
+
+                const fileObj = {
+                    id, name: file.name, imgElement, originalType: origType,
+                    mode: 'standard', debugMaskImg: null,
+                    params: {
+                        padding: 25, cx: imgElement.width / 2, cy: imgElement.height / 2, w: imgElement.width * 0.8, h: imgElement.height * 0.8, angle: 0,
+                        std_thr: 0, std_ker: 3, moi_win: 21, moi_sen: -25, tlc_hue: 240, tlc_tol: 10, tlc_ker: 5
+                    }
+                };
+                state.files.push(fileObj);
+                addFileToSidebar(fileObj);
+                // Always auto-detect; for first file also trigger selectFile to build UI
+                if (state.files.length === 1) {
+                    selectFile(id);
+                    runAutoDetect(fileObj).then(() => renderTarget(fileObj));
+                } else {
+                    runAutoDetect(fileObj);
+                }
+            }
+            els.fileCount.textContent = state.files.length;
+            showLoading(false);
+        }
+
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const buf = e.target.result;
+                    if (file.name.match(/\.(tif|tiff)$/i)) {
+                        try {
+                            const ifds = UTIF.decode(buf); UTIF.decodeImage(buf, ifds[0]);
+                            const rgba = UTIF.toRGBA8(ifds[0]); const c = document.createElement('canvas');
+                            c.width = ifds[0].width; c.height = ifds[0].height;
+                            const ctx = c.getContext('2d'); const idat = ctx.createImageData(c.width, c.height);
+                            idat.data.set(rgba); ctx.putImageData(idat, 0, 0);
+                            const img = new Image(); img.src = c.toDataURL(); img.onload = () => resolve(img);
+                        } catch (e) { reject(e); }
+                    } else {
+                        const img = new Image(); img.src = URL.createObjectURL(new Blob([buf]));
+                        img.onload = () => resolve(img); img.onerror = reject;
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function addFileToSidebar(f) {
+            const div = document.createElement('div');
+            div.className = 'group flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-700 transition relative border border-transparent';
+            div.dataset.id = f.id;
+            div.onclick = (e) => { if (!e.target.closest('.delete-btn')) selectFile(f.id); };
+
+            const c = document.createElement('canvas'); c.width = 40; c.height = 40; const ctx = c.getContext('2d');
+            const s = Math.min(f.imgElement.width, f.imgElement.height);
+            ctx.drawImage(f.imgElement, (f.imgElement.width - s) / 2, (f.imgElement.height - s) / 2, s, s, 0, 0, 40, 40);
+
+            div.innerHTML = `
+        <img src="${c.toDataURL()}" class="w-10 h-10 rounded object-cover bg-gray-900 border border-gray-600 shrink-0">
+        <div class="text-gray-500 font-mono text-xs">»</div>
+        <canvas class="sidebar-crop w-10 h-10 bg-black border border-gray-600 rounded shrink-0"></canvas>
+        <div class="flex-1 min-w-0">
+            <p class="text-xs text-gray-200 truncate font-medium">${f.name}</p>
+            <p class="text-[10px] text-gray-500 status-text flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-gray-500 dot"></span> 等待...
+            </p>
+        </div>
+        <button class="delete-btn p-1 text-gray-400 hover:text-red-400 rounded transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+    `;
+            div.querySelector('.delete-btn').onclick = () => removeFile(f.id);
+            els.fileList.appendChild(div);
+        }
+
+        function removeFile(id) {
+            const i = state.files.findIndex(x => x.id === id); if (i < 0) return;
+            state.files.splice(i, 1); els.fileList.querySelector(`[data-id="${id}"]`).remove();
+            if (state.currentId === id) {
+                state.currentId = null;
+                if (state.files.length) selectFile(state.files[0].id);
+                else { document.getElementById('emptyState').classList.remove('hidden'); document.getElementById('sidebarEmptyState').style.display = 'block'; els.ctxEditor.clearRect(0, 0, els.editorCanvas.width, els.editorCanvas.height); els.ctxPreview.clearRect(0, 0, els.previewCanvas.width, els.previewCanvas.height); }
+            }
+            els.fileCount.textContent = state.files.length;
+        }
+
+        // --- Selection & Dynamic UI ---
+        function selectFile(id) {
+            state.currentId = id;
+            document.querySelectorAll('#fileList > div').forEach(el => {
+                if (el.id === 'sidebarEmptyState') return;
+                el.classList.toggle('bg-gray-700', el.dataset.id === id); el.classList.toggle('border-gray-600', el.dataset.id === id);
+            });
+            const f = state.files.find(x => x.id === id); if (!f) return;
+
+            // Sync mode button
+            document.querySelectorAll('.mode-btn.mode-sel').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === f.mode);
+                b.onclick = () => { f.mode = b.dataset.mode; selectFile(f.id); runAutoDetect(f).then(() => renderTarget(f)); };
+            });
+
+            // Build specific params
+            els.paramContainer.innerHTML = '';
+            modeSpecs[f.mode].forEach(spec => {
+                const div = document.createElement('div'); div.className = 'flex flex-col shrink-0'; div.style.width = spec.tooltip ? '180px' : '128px';
+                div.innerHTML = `
+            <div class="flex justify-between text-xs text-gray-400 mb-1">
+                <span title="${spec.tooltip || ''}" class="${spec.tooltip ? 'cursor-help border-dotted border-b border-gray-500' : ''}"
+                >${spec.label}${spec.tooltip ? '<span class="text-yellow-500 ml-0.5">?</span>' : ''}</span>
+                <span id="v-${spec.id}">${f.params[spec.id]}</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <div class="adjust-btn" data-act="dec">-</div>
+                <input type="range" id="s-${spec.id}" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${f.params[spec.id]}" class="h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer w-full" style="accent-color: var(--${spec.color}-500, #3b82f6)">
+                <div class="adjust-btn" data-act="inc">+</div>
+            </div>
+        `;
+                els.paramContainer.appendChild(div);
+
+                const slider = div.querySelector('input');
+                const updateVal = (v) => {
+                    slider.value = v; div.querySelector(`#v-${spec.id}`).textContent = v;
+                    f.params[spec.id] = parseFloat(v);
+                    clearTimeout(window.calcTO); window.calcTO = setTimeout(() => runAutoDetect(f).then(() => renderTarget(f)), 250);
+                };
+                slider.oninput = (e) => div.querySelector(`#v-${spec.id}`).textContent = e.target.value;
+                slider.onchange = (e) => updateVal(e.target.value);
+
+                div.querySelectorAll('.adjust-btn').forEach(b => {
+                    let holdTO, iv;
+                    const act = () => {
+                        let cv = parseFloat(slider.value);
+                        if (b.dataset.act === 'inc') cv = Math.min(cv + spec.step, spec.max); else cv = Math.max(cv - spec.step, spec.min);
+                        updateVal(cv);
+                    };
+                    // Single click: act once. Hold >400ms: start rapid-fire.
+                    b.onmousedown = () => {
+                        act();
+                        holdTO = setTimeout(() => { iv = setInterval(act, 100); }, 400);
+                    };
+                    b.onmouseup = b.onmouseleave = () => { clearTimeout(holdTO); clearInterval(iv); };
+                });
+            });
+
+            // Padding common slider
+            els.padSlider.value = f.params.padding; els.padVal.textContent = f.params.padding + 'px';
+            els.padSlider.oninput = (e) => els.padVal.textContent = e.target.value + 'px';
+            els.padSlider.onchange = (e) => { f.params.padding = parseInt(e.target.value); renderTarget(f); };
+            document.querySelectorAll('[data-target="slide-pad"]').forEach(b => {
+                let holdTO, iv; const sl = els.padSlider;
+                const act = () => {
+                    let cv = parseInt(sl.value); cv = b.dataset.action === 'inc' ? Math.min(cv + 1, 100) : Math.max(cv - 1, 0);
+                    sl.value = cv; els.padVal.textContent = cv + 'px'; f.params.padding = cv; renderTarget(f);
+                };
+                b.onmousedown = () => {
+                    act();
+                    holdTO = setTimeout(() => { iv = setInterval(act, 80); }, 400);
+                };
+                b.onmouseup = b.onmouseleave = () => { clearTimeout(holdTO); clearInterval(iv); };
+            });
+
+            renderTarget(f);
+        }
+
+        document.getElementById('resetBtn').onclick = () => {
+            const f = state.files.find(x => x.id === state.currentId); if (f) { runAutoDetect(f).then(() => renderTarget(f)); }
+        }
+
+        async function runAutoDetect(f) {
+            return new Promise(async resolve => {
+                const el = els.fileList.querySelector(`[data-id="${f.id}"]`);
+                if (el) { el.querySelector('.status-text').innerHTML = `<span class="w-2 h-2 rounded-full bg-yellow-400 dot"></span> 運算中`; }
+
+                // Let UI update
+                await new Promise(r => requestAnimationFrame(() => setTimeout(r, 10)));
+
+                let res;
+                if (f.mode === 'standard') res = pipeStandard(f);
+                else if (f.mode === 'moire') res = pipeMoire(f);
+                else res = pipeTlc(f);
+
+                if (res && res.rect) {
+                    f.params.cx = res.rect.cx / res.scale;
+                    f.params.cy = res.rect.cy / res.scale;
+                    f.params.w = res.rect.w / res.scale;
+                    f.params.h = res.rect.h / res.scale;
+                    f.params.angle = res.rect.angle;
+
+                    // Build debug ImageBitmap
+                    const cd = document.createElement('canvas'); cd.width = res.w; cd.height = res.h;
+                    const ctx = cd.getContext('2d'); const idat = ctx.createImageData(res.w, res.h);
+                    for (let i = 0; i < res.w * res.h; i++) {
+                        idat.data[i * 4] = 255; idat.data[i * 4 + 1] = 0; idat.data[i * 4 + 2] = 0;
+                        idat.data[i * 4 + 3] = res.mask[i] ? 150 : 0;
+                    }
+                    ctx.putImageData(idat, 0, 0);
+                    f.debugMaskImg = cd; // Store canvas directly to scale easily later
+                }
+
+                if (el) { el.querySelector('.status-text').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 dot"></span> 已偵測 (${f.mode.substring(0, 3).toUpperCase()})`; }
+
+                // Auto update sidebar thumb
+                const sCvs = document.querySelector(`[data-id="${f.id}"] .sidebar-crop`);
+                if (sCvs) { drawCropCvs(f, sCvs); }
+
+                resolve();
+            });
+        }
+
+        // --- Graphical Rendering ---
+        function renderTarget(f) {
+            if (!f) return;
+
+            // 1. Editor
+            const ec = els.editorCanvas, ex = els.ctxEditor;
+            const parent = ec.parentElement;
+            const scale = Math.min(parent.clientWidth / f.imgElement.width, parent.clientHeight / f.imgElement.height);
+            state.canvasScale = scale;
+            ec.width = f.imgElement.width * scale; ec.height = f.imgElement.height * scale;
+            ex.clearRect(0, 0, ec.width, ec.height);
+            ex.drawImage(f.imgElement, 0, 0, ec.width, ec.height);
+
+            if (state.debugMode && f.debugMaskImg) {
+                ex.globalAlpha = 0.6;
+                ex.drawImage(f.debugMaskImg, 0, 0, ec.width, ec.height);
+                ex.globalAlpha = 1.0;
+            }
+
+            const cx = f.params.cx * scale, cy = f.params.cy * scale, w = f.params.w * scale, h = f.params.h * scale;
+            ex.save(); ex.translate(cx, cy); ex.rotate(f.params.angle);
+            ex.strokeStyle = '#00ff00'; ex.lineWidth = 2; ex.strokeRect(-w / 2, -h / 2, w, h);
+            ex.fillStyle = '#fff';
+            [{ x: -w / 2, y: -h / 2 }, { x: w / 2, y: -h / 2 }, { x: w / 2, y: h / 2 }, { x: -w / 2, y: h / 2 }].forEach(c => {
+                ex.fillRect(c.x - 4, c.y - 4, 8, 8); ex.strokeRect(c.x - 4, c.y - 4, 8, 8);
+            });
+            // Rotate Handle
+            ex.beginPath(); ex.moveTo(0, -h / 2); ex.lineTo(0, -h / 2 - 25); ex.stroke();
+            ex.beginPath(); ex.arc(0, -h / 2 - 25, 6, 0, Math.PI * 2); ex.fillStyle = '#00ff00'; ex.fill(); ex.stroke();
+            ex.restore();
+
+            // 2. Preview
+            drawCropCvs(f, els.previewCanvas);
+            const sCvs = document.querySelector(`[data-id="${f.id}"] .sidebar-crop`);
+            if (sCvs) drawCropCvs(f, sCvs);
+        }
+
+        function drawCropCvs(f, canvas) {
+            const pad = f.params.padding, fw = f.params.w + pad * 2, fh = f.params.h + pad * 2;
+            canvas.width = fw; canvas.height = fh;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fw, fh);
+            ctx.translate(fw / 2, fh / 2); ctx.rotate(-f.params.angle);
+            ctx.drawImage(f.imgElement, -f.params.cx, -f.params.cy);
+        }
+
+        document.getElementById('debugToggle').onchange = e => {
+            state.debugMode = e.target.checked;
+            const el = document.getElementById('editorLabel');
+            el.textContent = state.debugMode ? 'Debug 遮罩預覽 (原圖疊加)' : '原始影像 (編輯區)';
+            el.className = state.debugMode ? 'bg-black/50 px-2 py-1 rounded text-xs text-green-400 shadow' : 'bg-black/50 px-2 py-1 rounded text-xs text-gray-300 shadow';
+            renderTarget(state.files.find(x => x.id === state.currentId));
+        };
+
+        // --- Mouse Interaction for Non-Centric Scaling ---
+        function getM(e) { const r = els.editorCanvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+        function toLocal(m, f) {
+            const p = f.params, s = state.canvasScale;
+            let dx = m.x - p.cx * s, dy = m.y - p.cy * s;
+            const cos = Math.cos(-p.angle), sin = Math.sin(-p.angle);
+            return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+        }
+        function toGlobal(lx, ly, sp, s) {
+            const cos = Math.cos(sp.angle), sin = Math.sin(sp.angle);
+            return { x: sp.cx + (lx * cos - ly * sin) / s, y: sp.cy + (lx * sin + ly * cos) / s };
+        }
+
+        els.editorCanvas.onmousedown = e => {
+            const f = state.files.find(x => x.id === state.currentId); if (!f) return;
+            const m = getM(e), loc = toLocal(m, f), s = state.canvasScale, w = f.params.w * s, h = f.params.h * s;
+            state.dragStart = m; state.dragStartParams = { ...f.params };
+
+            // Interaction hitboxes
+            if (Math.abs(loc.x) < 20 && Math.abs(loc.y - (-h / 2 - 25)) < 20) { state.isDragging = true; state.dragMode = 'rotate'; return; }
+            if (Math.abs(loc.x - (-w / 2)) < 20 && Math.abs(loc.y - (-h / 2)) < 20) { state.isDragging = true; state.dragMode = 'tl'; return; }
+            if (Math.abs(loc.x - (w / 2)) < 20 && Math.abs(loc.y - (-h / 2)) < 20) { state.isDragging = true; state.dragMode = 'tr'; return; }
+            if (Math.abs(loc.x - (-w / 2)) < 20 && Math.abs(loc.y - (h / 2)) < 20) { state.isDragging = true; state.dragMode = 'bl'; return; }
+            if (Math.abs(loc.x - (w / 2)) < 20 && Math.abs(loc.y - (h / 2)) < 20) { state.isDragging = true; state.dragMode = 'br'; return; }
+            if (Math.abs(loc.x) < w / 2 && Math.abs(loc.y) < h / 2) { state.isDragging = true; state.dragMode = 'move'; els.editorCanvas.style.cursor = 'move'; return; }
+        };
+
+        window.onmousemove = e => {
+            if (!state.isDragging) return;
+            const f = state.files.find(x => x.id === state.currentId); if (!f) return;
+            const m = getM(e), s = state.canvasScale, sp = state.dragStartParams;
+
+            if (state.dragMode === 'move') {
+                f.params.cx = sp.cx + (m.x - state.dragStart.x) / s;
+                f.params.cy = sp.cy + (m.y - state.dragStart.y) / s;
+            } else if (state.dragMode === 'rotate') {
+                f.params.angle = Math.atan2(m.y - sp.cy * s, m.x - sp.cx * s) + Math.PI / 2;
+            } else if (['tl', 'tr', 'bl', 'br'].includes(state.dragMode)) {
+                // ─── Correct Non-Centric Scaling ────────────────────────────────
+                // Strategy: compute fixed corner (opposite to dragged) in WORLD space
+                // using start params, then derive new box from fixed corner to mouse.
+                const cosA = Math.cos(sp.angle), sinA = Math.sin(sp.angle);
+
+                // Each corner in image-pixel coords relative to center (local space), then rotate to world
+                // Local coords of opposite (fixed) corner
+                const fixedCorners = {
+                    tl: { lx: sp.w / 2, ly: sp.h / 2 }, // BR is fixed when TL is dragged
+                    tr: { lx: -sp.w / 2, ly: sp.h / 2 }, // BL
+                    bl: { lx: sp.w / 2, ly: -sp.h / 2 }, // TR
+                    br: { lx: -sp.w / 2, ly: -sp.h / 2 }  // TL
+                };
+                const fc = fixedCorners[state.dragMode];
+
+                // Fixed corner in image-pixel world space
+                const fixWX = sp.cx + fc.lx * cosA - fc.ly * sinA;
+                const fixWY = sp.cy + fc.lx * sinA + fc.ly * cosA;
+
+                // Mouse in image-pixel world space
+                const mouseWX = m.x / s;
+                const mouseWY = m.y / s;
+
+                // Vector from fixed corner to mouse corner in world space
+                const vx = mouseWX - fixWX, vy = mouseWY - fixWY;
+
+                // Rotate vector to local space (by -angle)
+                const lx = vx * cosA + vy * sinA;
+                const ly = -vx * sinA + vy * cosA;
+
+                // Derive new dimensions from the vector (depends on which is dragged)
+                // For TL drag: vector from BR(fixed)→TL(mouse) = (-newW, -newH)
+                let newW, newH;
+                const signX = state.dragMode === 'tr' || state.dragMode === 'br' ? 1 : -1;
+                const signY = state.dragMode === 'bl' || state.dragMode === 'br' ? 1 : -1;
+                newW = Math.max(20, signX * lx);
+                newH = Math.max(20, signY * ly);
+
+                f.params.w = newW;
+                f.params.h = newH;
+
+                // New center: fixed corner + offset to new center in local space, then rotate back to world
+                // Offset from fixed corner to center = half-diagonal (toward dragged corner)
+                const cOffLX = signX * newW / 2 * (-1); // opposite direction of fixed→mouse
+                const cOffLY = signY * newH / 2 * (-1);
+                // (cOff is vector from fixed to new center, in local)
+                // Actually: center = fixed + (direction from fixed to center)
+                // fixed is at (fc.lx, fc.ly) in old local, new center is at (0,0) in new local
+                // new center in world = fixedWorld + rotate(newCenterFromFixed_inLocal)
+                // In new box's local, fixed corner is at (-fc.lx/sp.w * newW, -fc.ly/sp.h * newH)... no
+                // Simpler: center is midpoint of fixed and mouse corners in world space!
+                f.params.cx = (fixWX + mouseWX) / 2;
+                f.params.cy = (fixWY + mouseWY) / 2;
+            }
+            renderTarget(f);
+        };
+
+        window.onmouseup = () => { state.isDragging = false; state.dragMode = null; els.editorCanvas.style.cursor = 'crosshair'; };
+
+        // Batch download
+        document.getElementById('downloadAllBtn').onclick = async () => {
+            if (!state.files.length) return;
+            showLoading(true, "打包中...");
+            const zip = new JSZip(); const folder = zip.folder("cropped_results");
+            for (const f of state.files) {
+                const p = f.params, pad = p.padding;
+                const fw = p.w + pad * 2, fh = p.h + pad * 2;
+                const cvs = document.createElement('canvas'); cvs.width = fw; cvs.height = fh;
+                const ctx = cvs.getContext('2d');
+                ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fw, fh);
+                ctx.translate(fw / 2, fh / 2); ctx.rotate(-p.angle);
+                ctx.drawImage(f.imgElement, -p.cx, -p.cy);
+                let mime = 'image/png', ext = 'png'; if (f.originalType === 'image/jpeg') { mime = 'image/jpeg'; ext = 'jpg'; }
+                const blob = await new Promise(r => cvs.toBlob(r, mime, 1.0));
+                folder.file(f.name.replace(/\.[^/.]+$/, "") + `_[${f.mode}]_cropped.` + ext, blob);
+            }
+            saveAs(await zip.generateAsync({ type: "blob" }), "GelCrop_v4_Results.zip");
+            showLoading(false);
+        };
+
+    </script>
+</body>
+
+</html>
