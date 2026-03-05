@@ -26,7 +26,7 @@
 在實驗過程中，學生需拍攝電泳膠片 (Electrophoresis Gels) 並將其黏貼於實驗紀錄簿 (Lab Notebook)。作為助教，每週需要處理數十份學生的膠片照片，面臨以下痛點：
 
 * **重複性高**：每張照片都需要手動旋轉、去除背景雜訊並裁切成統一矩形。
-* **耗時**：人工處理每次耗費約 1 小時，且容易產生格式不一的問題。
+* **耗時**：人工處理每次耗費約 15 分鐘，且容易產生格式不一的問題。
 
 ## 解決方案 (Solution)
 
@@ -158,3 +158,4 @@ git clone https://github.com/allenphant/Gel-Image-Auto-Cropper.git
 ---
 
 *Developed with ❤️ for the microbiology lab.*
+
