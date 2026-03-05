@@ -390,7 +390,7 @@
                 if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
                 if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
             }
-            return { cx, cy, w: maxX - minX, h: maxY - minY, angle, valid: true };
+            return { cx, cy, w: (maxX - minX) * 1.04, h: (maxY - minY) * 1.04, angle, valid: true };
         }
 
         // --- Specific Pipelines ---
@@ -424,7 +424,7 @@
         }
 
         function pipeMoire(f) {
-            const { data, w, h, scale } = downsample(f.imgElement, 150); // Heavy downscale
+            const { data, w, h, scale } = downsample(f.imgElement, 200); // Moderate downscale (was 150)
             const feat = new Float32Array(w * h);
             for (let i = 0; i < w * h; i++) feat[i] = data.data[i * 4] * 0.3 + data.data[i * 4 + 1] * 0.6 + data.data[i * 4 + 2] * 0.1;
 
