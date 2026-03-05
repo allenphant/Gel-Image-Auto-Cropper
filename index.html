@@ -141,6 +141,7 @@
                 </svg>
                 全部下載 (.zip)
             </button>
+            <span class="text-[10px] text-gray-500 hidden sm:inline">單張下載：右鍵預覽圖 → 另存圖片</span>
         </div>
     </header>
 
@@ -466,7 +467,13 @@
             }
             mask = morphOp(mask, w, h, ker, ker, false);
             mask = morphOp(mask, w, h, ker + 2, ker + 2, true);
-            return { mask, w, h, scale, rect: getLargestBlobRect(mask, w, h) };
+            const rect = getLargestBlobRect(mask, w, h);
+            // Normalize angle to smallest rotation: keep original orientation
+            if (rect && rect.valid) {
+                while (rect.angle > Math.PI / 4) { rect.angle -= Math.PI / 2; const tmp = rect.w; rect.w = rect.h; rect.h = tmp; }
+                while (rect.angle < -Math.PI / 4) { rect.angle += Math.PI / 2; const tmp = rect.w; rect.w = rect.h; rect.h = tmp; }
+            }
+            return { mask, w, h, scale, rect };
         }
 
         // --- File Handling & Lifecycle ---
