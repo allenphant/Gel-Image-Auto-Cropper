@@ -14,7 +14,7 @@
 
 ## 專案背景 (Background)
 
-本專案最初開發於 2022 年，應用於大學部的「生物核心技術實驗」課程。該課程以 **分子生物學中心法則 (Central Dogma)** 為骨幹，引導學生學習從基因到蛋白質的完整實驗流程：
+本專案開發於 2022 年，應用於大學部的「生物核心技術實驗」課程。該課程以 **分子生物學中心法則 (Central Dogma)** 為骨幹，引導學生學習從基因到蛋白質的完整實驗流程：
 
 1. **基因選殖**：以 GUS 酵素基因 (GUS gene) 為標的。
 2. **基因轉殖與剪接**：DNA Splicing & Gene Transfer。
@@ -30,13 +30,7 @@
 
 ## 解決方案 (Solution)
 
-### v1 — Python + Tkinter 桌面版 (2022)
-
-最初版本以 Python + Pillow 實作影像處理，使用 Tkinter 封裝為 GUI 桌面應用程式，並打包為 `.exe` 供實驗室公用電腦直接使用。
-
-### v4 — 純前端 Web App (2025, Current)
-
-為了讓任何人無需安裝任何軟體即可使用，專案已全面重構為 **純前端 Web 應用程式**。所有影像處理皆在瀏覽器端執行，**檔案不會上傳至任何伺服器**，確保實驗數據的機密性。
+一套 **純前端 Web 應用程式**——打開瀏覽器即可使用，無需安裝任何軟體。所有影像處理皆在瀏覽器端執行 (HTML5 Canvas + JavaScript)，**檔案不會上傳至任何伺服器**，確保實驗數據的機密性。
 
 ---
 
@@ -44,7 +38,7 @@
 
 | 功能 | 說明 |
 |------|------|
-| 🔒 **純前端運行** | 所有處理皆在瀏覽器內完成 (HTML5 Canvas + JavaScript)，資料不離開你的電腦 |
+| 🔒 **純前端運行** | 所有處理皆在瀏覽器內完成，資料不離開你的電腦 |
 | 📁 **多格式支援** | `.jpg`, `.png`, `.bmp`, `.tif` / `.tiff` (via UTIF.js) |
 | 📦 **批次上傳** | 一次選取多個檔案或整個資料夾，系統自動對每張影像執行偵測 |
 | 🤖 **三模式自動偵測** | 針對不同情境切換最佳演算法 (見下方) |
@@ -55,8 +49,6 @@
 | ⌨️ **鍵盤快捷鍵** | `↑` / `↓` 方向鍵快速切換檔案 |
 
 ## 三種偵測模式 (Detection Modes)
-
-本工具針對不同類型的膠片影像提供三套專用的影像處理管線：
 
 ### A. 標準膠片模式 (Standard Gel)
 適用於一般電泳膠片照片（黑底亮帶）。
@@ -77,6 +69,30 @@
 - 根據 HSV 色相 (Hue) 過濾掉指定的背景色（通常是藍紫色 UV 光）
 - 形態學運算去除 TLC 片表面的灰塵斑點
 - 可調參數：**背景色相**、**色相寬容度**、**去塵強度**
+
+---
+
+## 實際演示 (Demo)
+
+### A. 標準膠片 (Standard Gel)
+
+| 原始照片 (Before) | 裁切結果 (After) |
+|:-:|:-:|
+| ![Standard Before](data/demo/before.png) | ![Standard After](data/demo/after.png) |
+
+### B. 摩爾紋膠片 (Moiré Pattern)
+
+| 原始照片 (Before) | 裁切結果 (After) |
+|:-:|:-:|
+| ![Moiré Before](data/demo/moire/before.png) | ![Moiré After](data/demo/moire/after.png) |
+
+### C. TLC 紙片 (TLC Plate + UV)
+
+| 原始照片 (Before) | 裁切結果 (After) |
+|:-:|:-:|
+| ![TLC Before](data/demo/tlc/before.png) | ![TLC After](data/demo/tlc/after.png) |
+
+---
 
 ## 影像辨識原理 (Algorithm Pipeline)
 
@@ -123,15 +139,7 @@
 
 * **效率提升**：將原本需花費 **1 小時以上** 的批次人工修圖，縮短至 **30 秒** 內完成。
 * **標準化**：確保所有實驗紀錄圖片格式統一，提升報告與論文品質。
-* **零門檻**：無需安裝 Python、OpenCV 或任何軟體，打開瀏覽器即可使用。
-
-## 實際演示 (Demo)
-
-### 原始膠片 (Raw Data)
-![Raw Gel](data/demo/before.png)
-
-### 處理後成果 (Processed Output)
-![Processed Gel](data/demo/after.png)
+* **零門檻**：無需安裝任何軟體，打開瀏覽器即可使用。
 
 ## 如何使用 (How to Use)
 
@@ -145,12 +153,6 @@ git clone https://github.com/allenphant/Gel-Image-Auto-Cropper.git
 
 # Open index.html in your browser — that's it!
 # No server, no dependencies, no installation needed.
-```
-
-### Legacy Python 版 (v1)
-```bash
-pip install -r requirements.txt
-python src/main.py
 ```
 
 ---
